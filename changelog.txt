@@ -1,6 +1,12 @@
 ﻿# Change Log
 All notable changes to this project will be documented in this file.
 
+## [1.0.0] - 2016-11-16
+### Changed
+- Uso de zlib
+- Mejora de manejo de cache
+- Servicio de acceso a tiras
+
 ## [0.0.8] - 2016-11-11
 ### Added
 - Nueva versión del backend
