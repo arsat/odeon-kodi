@@ -32,8 +32,6 @@ from resources.lib import utils
 PLUGIN_NAME = 'plugin.video.odeon'
 API_URL     = 'https://www.odeon.com.ar/api/v1.4'
 ID_URL      = 'https://id.odeon.com.ar/v1.3'
-#API_URL    = 'https://odeon.desa.dcarsat.com.ar/api/v1.4'
-#ID_URL     = 'https://id.desa.dcarsat.com.ar/v1.3'
 
 addon_url = sys.argv[0]
 addon_handle = int(sys.argv[1])

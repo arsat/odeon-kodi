@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <addon id="plugin.video.odeon"
-       name="Odeon" version="1.0.0"
+       name="Odeon" version="1.2.0"
        provider-name="ARSAT">
     <requires>
         <import addon="xbmc.python" version="2.24.0"/>
