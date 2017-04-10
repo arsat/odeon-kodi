@@ -123,7 +123,7 @@ def root_menu(params):
             return
 
     # Home / Inicio
-    add_directory_item(translation(30009), 'list_tiras')
+    add_directory_item(translation(30009), 'list_tiras', 'folder.png')
     # Últimas vistas
     add_directory_item(translation(30010), 'list_prods&url=%s' % quote('tira/histoprods'), 'folder-movies.png')
     # Películas, Series, Cortos, Especiales para perfiles no infantiles
@@ -131,7 +131,7 @@ def root_menu(params):
     for tipo in sorted(categories['tipos'], key=lambda cat: cat['orden']):
         add_directory_item(tipo['text'], 'list_prods&url=%s' % quote('tipo/' + tipo['tag']), 'folder-movies.png')
     # Explorar
-    add_directory_item(translation(30011), 'list_generos')
+    add_directory_item(translation(30011), 'list_generos', 'folder.png')
     # Mi sala
     add_directory_item(translation(30012), 'list_prods&url=%s' % quote('tira/misala'), 'folder-movies.png')
     # Búsqueda
@@ -566,21 +566,14 @@ def json_request(path, params=None):
     return data
 
 
-def get_metadata(refresh=False):
-    if refresh:
-        metadata = json_request('metadata')
-        addon.setSetting('metadata', json.dumps(metadata))
-
-    return json.loads(addon.getSetting('metadata'))
-
-
 if __name__ == '__main__':
     from urlparse import parse_qsl
     params = dict(parse_qsl(sys.argv[2][1:]))
     if params:
-        META = get_metadata()
+        META = json.loads(addon.getSetting('metadata'))
         PID = params['pid']
         globals()[params['action']](params)
     else:
-        META = get_metadata(refresh=True)
+        META = json_request('metadata')
+        addon.setSetting('metadata', json.dumps(META))
         list_profiles()
