@@ -24,14 +24,18 @@ import xbmcaddon
 import urllib
 import json
 import os
+#import web_pdb; web_pdb.set_trace() #para debuggear (pone breakpoint)
 
 from resources.lib import simplerequests as requests
 from resources.lib import odeoncache
 from resources.lib import utils
 
 PLUGIN_NAME = 'plugin.video.odeon'
-API_URL     = 'https://www.odeon.com.ar/api/v1.4'
-ID_URL      = 'https://id.odeon.com.ar/v1.3'
+#API_URL     = 'https://odeon.desa.dcarsat.com.ar/api/v1.6'
+#API_URL     = 'http://0.0.0.0:8080/api/v1.6'
+API_URL     = 'https://www.odeon.com.ar/api/v1.6'
+#ID_URL      = 'https://id.desa.dcarsat.com.ar/v1.4'
+ID_URL      = 'https://id.odeon.com.ar/v1.4'
 
 addon_url = sys.argv[0]
 addon_handle = int(sys.argv[1])
@@ -134,6 +138,8 @@ def root_menu(params):
     add_directory_item(translation(30011), 'list_generos', 'folder.png')
     # Mi sala
     add_directory_item(translation(30012), 'list_prods&url=%s' % quote('tira/misala'), 'folder-movies.png')
+    # Mis alquileres
+    add_directory_item(translation(30032), 'list_prods&url=%s' % quote('tvod/INCAA/rentals'), 'folder-movies.png')
     # Búsqueda
     add_directory_item(translation(30013), 'search', 'search.png')
     # Cerrar sesión
@@ -149,7 +155,8 @@ def list_tiras(params):
 
     # tiras dinámicas
     for tira in json_request('tiras?perfil={0}'.format(PID)):
-        add_directory_item(tira['titulo'], 'list_prods&url=%s' % quote('tira/' + str(tira['id'])), 'folder-movies.png')
+        requesting_tvods = '&tvod=1' if tira['titulo'].lower() == 'estrenos' else '' #si hay que listar los tvods
+        add_directory_item(tira['titulo'], 'list_prods&url=%s' % quote('tira/' + str(tira['id'])) + requesting_tvods, 'folder-movies.png')
 
     xbmcplugin.endOfDirectory(addon_handle)
 
@@ -176,6 +183,10 @@ def list_prods(params):
     items = int(addon.getSetting('itemsPerPage'))
     page = int(params.get('pag', '1'))
     orden = params.get('orden')
+    listing_tvods = params.get('tvod')
+
+    if 'tvod' in params['url'].lower() or listing_tvods:
+        xbmcgui.Dialog().ok('Estrenos', translation(30033))
 
     path = '{0}?perfil={1}&cant={2}&pag={3}'.format(params['url'], PID, items, page)
     if orden: path += '&orden={0}'.format(orden)
@@ -195,34 +206,39 @@ def list_prods(params):
 
 def list_subprods(params):
     """ Arma la lista de producciones para series y compilados (especiales) """
+    season = params.get('season')   # temporada seleccionada o None
+    fullItems = params.get('full')
+    #'items' restringe por temporada en caso de cabeserie
     path = '{0}/prod/{1}?perfil={2}'.format(params['source'], params['sid'], PID)
+    if fullItems:
+        path += '&items=' + (season or '0')
     prod_list = json_request(path)
-
     if prod_list['tipos'][0]['tag'] == 'cabeserie':
 
         # set comprehension falla en ARM: seasons = {epi['tempo'] for epi in prod_list['items']}
-        seasons = list(set([epi['tempo'] for epi in prod_list['items']]))
-        season = params.get('season')   # temporada seleccionada o None
+        seasons = list(set([epi.get('tempo') or epi['capitulo']['tempo'] for epi in prod_list['items']]))
 
-        if not season and len(seasons) > 1:
+        if not season:
             # lista temporadas
-            for season in sorted(seasons):
-                query = 'list_subprods&source={0}&sid={1}&season={2}'.format(params['source'], params['sid'], season)
-                art = {'fanart': image_url(prod_list.get('ban'), 'odeon_slider')}
-                add_directory_item('Temporada {0}'.format(season), query, 'folder-movies.png', art=art, info=get_info(prod_list))
+            if len(seasons) > 1:
+                for season in sorted(seasons):
+                    query = 'list_subprods&source={0}&sid={1}&season={2}&full={3}'.format(params['source'], params['sid'], season, 1)
+                    art = {'fanart': image_url(prod_list.get('ban'), 'odeon_slider')}
+                    add_directory_item('Temporada {0}'.format(season), query, 'folder-movies.png', art=art, info=get_info(prod_list))
+            else:
+                params['full'] = '1'
+                params['season'] = '1'
+                return list_subprods(params)
         else:
             # lista capítulos de temporada
             for episode in prod_list['items']:
-                if not season or episode['tempo'] == int(season):
-                    path = '{0}/prod/{1}?perfil={2}'.format(params['source'], episode['sid'], PID)
-                    subprod = json_request(path)
-                    add_film_item(subprod, params)
+                #hay solo capitulos de la temporada pedida, o todos si no se especifico
+                add_film_item(episode, params)
+
     else:
         # lista compilados dentro de especiales
         for compi in prod_list['items']:
-            path = '{0}/prod/{1}?perfil={2}'.format(compi['id']['source'], compi['id']['sid'], PID)
-            subprod = json_request(path)
-            add_film_item(subprod, params)
+            add_film_item(compi, params)
 
     xbmcplugin.endOfDirectory(addon_handle)
 
@@ -262,20 +278,17 @@ def image_url(image, context):
 
 
 def get_art(prod):
-    thumb = poster = banner = fanart = None
-    if prod.has_key('afi'):
-        thumb  = image_url(prod['afi'], 'odeon_afiche_suge')
-        poster = image_url(prod['afi'], 'odeon_afiche_prod')
-    elif prod.has_key('afis') and len(prod['afis']) > 0:
-        thumb  = image_url(prod['afis'][0], 'odeon_afiche_suge')
-        poster = image_url(prod['afis'][0], 'odeon_afiche_prod')
-    if prod.has_key('ban'):
-        banner = image_url(prod['ban'], 'odeon_slider')
-    if prod.has_key('foto'):
-        fanart = image_url(prod['foto'], 'odeon_fotograma_ampli')
-    elif prod.has_key('fotos') and len(prod['fotos']) > 0:
-        fanart = image_url(prod['fotos'][0], 'odeon_fotograma_ampli')
-    return {'thumb':thumb, 'poster': poster, 'banner': banner, 'fanart': fanart}
+
+    afiche = prod['afis'][0] if 'afis' in prod and len(prod['afis']) > 0 else prod.get('afi', None)
+    thumb  = image_url(afiche, 'odeon_afiche_suge')
+    poster = image_url(afiche, 'odeon_afiche_prod')
+
+    banner = image_url(prod['ban'], 'odeon_slider') if 'ban' in prod else None
+
+    foto = prod['fotos'][0] if 'fotos' in prod and len(prod['fotos']) > 0 else prod.get('foto', None)
+    fanart = image_url(foto, 'odeon_fotograma_ampli')
+
+    return {'thumb': thumb, 'poster': poster, 'banner': banner, 'fanart': fanart}
 
 
 def run_plugin(query, prod, params):
@@ -336,6 +349,8 @@ def add_film_item(prod, params):
     if has_subprods:
         url = '{0}?action={1}&pid={2}&source={3}&sid={4}'.format(
                 addon_url, 'list_subprods', PID, prod['id']['source'], prod['id']['sid'])
+        if 'compi' in prod['tags']:
+            url += '&full=1'
         is_folder = True
     else:
         url = '{0}?action={1}&pid={2}&source={3}&sid={4}'.format(
@@ -474,10 +489,14 @@ def play(params):
         xbmc.log('ERROR [{0}]: play - code ({1}) - {2}'.format(PLUGIN_NAME, response.status_code, errmsg))
         xbmcgui.Dialog().ok('Error player ({0})'.format(response.status_code), errmsg)
 
+try:
+    user_agent = xbmc.getUserAgent() #user_agent = 'Kodi/17.1 (X11; Linux x86_64) Ubuntu/14.04 App_Bitness/64 Version/17.1-Git:20170320-nogitfound'
+except:
+    user_agent = 'kodi/' + addon_version
 
 def get_headers(token=None, etag=None, auth=None):
     header = {'Content-type': 'application/json; charset=utf-8',
-              'User-Agent': 'kodi/' + addon_version,
+              'User-Agent': user_agent,
               'Accept': 'application/json, text/plain',
               'Referer': 'plugin://kodi.odeon.com.ar'
              }
