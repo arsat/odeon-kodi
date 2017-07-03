@@ -24,17 +24,13 @@ import xbmcaddon
 import urllib
 import json
 import os
-#import web_pdb; web_pdb.set_trace() #para debuggear (pone breakpoint)
 
 from resources.lib import simplerequests as requests
 from resources.lib import odeoncache
 from resources.lib import utils
 
 PLUGIN_NAME = 'plugin.video.odeon'
-#API_URL     = 'https://odeon.desa.dcarsat.com.ar/api/v1.6'
-#API_URL     = 'http://0.0.0.0:8080/api/v1.6'
 API_URL     = 'https://www.odeon.com.ar/api/v1.6'
-#ID_URL      = 'https://id.desa.dcarsat.com.ar/v1.4'
 ID_URL      = 'https://id.odeon.com.ar/v1.4'
 
 addon_url = sys.argv[0]
@@ -109,7 +105,7 @@ def list_profiles():
 
     # arma la lista de perfiles
     for profile in profiles['perfiles']:
-        query = 'root_menu&pid={0}&alias={1}&conclave={2}'.format(profile['id'], profile['alias'], profile.get('conclave'))
+        query = 'root_menu&pid={0}&alias={1}&conclave={2}'.format(profile['id'], profile['alias'].encode('utf-8'), profile.get('conclave'))
         add_directory_item(profile['alias'], query, art={"poster": image_url(profile['avatar'], 'avatar')})
     xbmcplugin.endOfDirectory(addon_handle)
 
@@ -155,8 +151,7 @@ def list_tiras(params):
 
     # tiras dinámicas
     for tira in json_request('tiras?perfil={0}'.format(PID)):
-        requesting_tvods = '&tvod=1' if tira['titulo'].lower() == 'estrenos' else '' #si hay que listar los tvods
-        add_directory_item(tira['titulo'], 'list_prods&url=%s' % quote('tira/' + str(tira['id'])) + requesting_tvods, 'folder-movies.png')
+        add_directory_item(tira['titulo'], 'list_prods&url=%s' % quote('tira/' + str(tira['id'])), 'folder-movies.png')
 
     xbmcplugin.endOfDirectory(addon_handle)
 
@@ -183,10 +178,9 @@ def list_prods(params):
     items = int(addon.getSetting('itemsPerPage'))
     page = int(params.get('pag', '1'))
     orden = params.get('orden')
-    listing_tvods = params.get('tvod')
 
-    if 'tvod' in params['url'].lower() or listing_tvods:
-        xbmcgui.Dialog().ok('Estrenos', translation(30033))
+    if 'tvod' in params['url']:
+        xbmcgui.Dialog().ok(translation(30033), translation(30034))
 
     path = '{0}?perfil={1}&cant={2}&pag={3}'.format(params['url'], PID, items, page)
     if orden: path += '&orden={0}'.format(orden)
@@ -206,34 +200,34 @@ def list_prods(params):
 
 def list_subprods(params):
     """ Arma la lista de producciones para series y compilados (especiales) """
-    season = params.get('season')   # temporada seleccionada o None
-    fullItems = params.get('full')
-    #'items' restringe por temporada en caso de cabeserie
     path = '{0}/prod/{1}?perfil={2}'.format(params['source'], params['sid'], PID)
-    if fullItems:
+    # 'items' restringe por temporada en caso de cabeserie
+    season = params.get('season')   # temporada seleccionada o None
+    if params.get('full'):
         path += '&items=' + (season or '0')
     prod_list = json_request(path)
+
     if prod_list['tipos'][0]['tag'] == 'cabeserie':
 
         # set comprehension falla en ARM: seasons = {epi['tempo'] for epi in prod_list['items']}
         seasons = list(set([epi.get('tempo') or epi['capitulo']['tempo'] for epi in prod_list['items']]))
 
-        if not season:
-            # lista temporadas
-            if len(seasons) > 1:
-                for season in sorted(seasons):
-                    query = 'list_subprods&source={0}&sid={1}&season={2}&full={3}'.format(params['source'], params['sid'], season, 1)
-                    art = {'fanart': image_url(prod_list.get('ban'), 'odeon_slider')}
-                    add_directory_item('Temporada {0}'.format(season), query, 'folder-movies.png', art=art, info=get_info(prod_list))
-            else:
-                params['full'] = '1'
-                params['season'] = '1'
-                return list_subprods(params)
-        else:
+        if season:
             # lista capítulos de temporada
             for episode in prod_list['items']:
-                #hay solo capitulos de la temporada pedida, o todos si no se especifico
                 add_film_item(episode, params)
+
+        elif len(seasons) > 1:
+            # lista temporadas para que el usuario elija
+            for season in sorted(seasons):
+                query = 'list_subprods&source={0}&sid={1}&season={2}&full={3}'.format(params['source'], params['sid'], season, 1)
+                art = {'fanart': image_url(prod_list.get('ban'), 'odeon_slider')}
+                add_directory_item('Temporada {0}'.format(season), query, 'folder-movies.png', art=art, info=get_info(prod_list))
+        else:
+            # hay una sola temporada
+            params['full'] = '1'
+            params['season'] = seasons[0]
+            return list_subprods(params)
 
     else:
         # lista compilados dentro de especiales
@@ -278,7 +272,6 @@ def image_url(image, context):
 
 
 def get_art(prod):
-
     afiche = prod['afis'][0] if 'afis' in prod and len(prod['afis']) > 0 else prod.get('afi', None)
     thumb  = image_url(afiche, 'odeon_afiche_suge')
     poster = image_url(afiche, 'odeon_afiche_prod')
@@ -349,8 +342,7 @@ def add_film_item(prod, params):
     if has_subprods:
         url = '{0}?action={1}&pid={2}&source={3}&sid={4}'.format(
                 addon_url, 'list_subprods', PID, prod['id']['source'], prod['id']['sid'])
-        if 'compi' in prod['tags']:
-            url += '&full=1'
+        url += '&full=1' if 'compi' in prod['tags'] else ''
         is_folder = True
     else:
         url = '{0}?action={1}&pid={2}&source={3}&sid={4}'.format(
@@ -486,17 +478,12 @@ def play(params):
 
         monitor(params['source'], params['sid'], seek)
     else:
-        xbmc.log('ERROR [{0}]: play - code ({1}) - {2}'.format(PLUGIN_NAME, response.status_code, errmsg))
-        xbmcgui.Dialog().ok('Error player ({0})'.format(response.status_code), errmsg)
+        show_error('Error Player', response.status_code, errmsg)
 
-try:
-    user_agent = xbmc.getUserAgent() #user_agent = 'Kodi/17.1 (X11; Linux x86_64) Ubuntu/14.04 App_Bitness/64 Version/17.1-Git:20170320-nogitfound'
-except:
-    user_agent = 'kodi/' + addon_version
 
 def get_headers(token=None, etag=None, auth=None):
     header = {'Content-type': 'application/json; charset=utf-8',
-              'User-Agent': user_agent,
+              'User-Agent': 'kodi/' + addon_version,
               'Accept': 'application/json, text/plain',
               'Referer': 'plugin://kodi.odeon.com.ar'
              }
@@ -533,6 +520,14 @@ def decode_json(response):
     return None, errmsg
 
 
+def show_error(title, status, message):
+    try:
+        xbmcgui.Dialog().ok('{0} ({1})'.format(title, status), message)
+        xbmc.log('ERROR [{0}]: {1} - code ({2}) - {3}'.format(PLUGIN_NAME, title, status, message.encode('utf8', 'ignore')))
+    except:
+        pass
+
+
 def json_request(path, params=None):
     """ Emula el comportamiento de un browser """
     min_max_age = 300 # mínimo que valga la pena usar el cache
@@ -550,19 +545,17 @@ def json_request(path, params=None):
 
     r = requests.get(url, headers=get_headers(token, cachedEtag), compress=True)
 
-    # valida autenticación 4xx
-    if r.status_code // 100 == 4:
-        # 'user' no debe generar mensaje ya que se usa para validar los tokens
+    if r.status_code == 401:
+        # 'user' se usa en el login para validar tokens
         if path == 'user': return None
-        # el resto puede expirar durante la navegación, debe volver a ingresar
+        # si el token expira durante la navegación debe volver a ingresar
         xbmcgui.Dialog().ok(translation(30029), translation(30030))
         close_session([])
         sys.exit(0)
 
     # raise for status
     elif r.status_code >= 400:
-        xbmc.log('ERROR [{0}]: json_request - code ({1}) - {2}'.format(PLUGIN_NAME, r.status_code, r.content))
-        xbmcgui.Dialog().ok('Error ({0})'.format(r.status_code), r.content)
+        show_error('Error Request', r.status_code, r.content)
         close_session([])
         sys.exit(0)
 
@@ -576,8 +569,7 @@ def json_request(path, params=None):
     if not r.content: return None
     data, errmsg = decode_json(r)
     if not data:
-        xbmc.log('ERROR [{0}]: json_request - code ({1}) - {2}'.format(PLUGIN_NAME, r.status_code, errmsg))
-        xbmcgui.Dialog().ok('Error ({0})'.format(r.status_code), errmsg)
+        show_error('Error Request', r.status_code, errmsg)
         sys.exit(0)
 
     if newEtag or ttl > min_max_age:

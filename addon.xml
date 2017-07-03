@@ -5,7 +5,6 @@
     <requires>
         <import addon="xbmc.python" version="2.24.0"/>
         <import addon="script.common.plugin.cache" version="2.5.8"/>
-        <!-- <import addon="script.module.web-pdb" version="1.0"/> quitar despues de debuggear-->
     </requires>
     <extension point="xbmc.python.pluginsource" library="odeon.py">
         <provides>video</provides>
@@ -23,8 +22,8 @@
         <forum>http://forum.kodi.tv/showthread.php?tid=296742</forum>
         <website>https://www.odeon.com.ar</website>
         <email>consultas@odeon.com.ar</email>
-        <news>v1.3.0  (2017-04-17)
+        <news>v1.3.0  (2017-06-30)
         - Rebranding to Cine.ar Play.
-        - New API version.</news>
+        - Bug fixes.</news>
     </extension>
 </addon>

@@ -145,6 +145,10 @@ msgid "My rentals"
 msgstr ""
 
 msgctxt "#30033"
+msgid "Premieres"
+msgstr ""
+
+msgctxt "#30034"
 msgid "To rent a production, please do so from the webpage."
 msgstr ""
 
