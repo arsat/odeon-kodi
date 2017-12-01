@@ -26,12 +26,11 @@ import json
 import os
 
 from resources.lib import simplerequests as requests
-from resources.lib import odeoncache
-from resources.lib import utils
+from resources.lib import odeoncache as utils
 
 PLUGIN_NAME = 'plugin.video.odeon'
-API_URL     = 'https://www.odeon.com.ar/api/v1.6'
-ID_URL      = 'https://id.odeon.com.ar/v1.4'
+API_URL     = 'https://play.cine.ar/api/v1.6'
+ID_URL      = 'https://id.cine.ar/v1.5'
 
 addon_url = sys.argv[0]
 addon_handle = int(sys.argv[1])
@@ -530,7 +529,7 @@ def json_request(path, params=None):
     """ Emula el comportamiento de un browser """
     min_max_age = 300 # mínimo que valga la pena usar el cache
     token = addon.getSetting('token')
-    cache = odeoncache.OdeonCache(PLUGIN_NAME)
+    cache = utils.OdeonCache(PLUGIN_NAME)
     url = make_url(path, params)
 
     fromCache = cache.get(url)
