@@ -152,6 +152,10 @@ msgctxt "#30034"
 msgid "To rent a production, please do so from the webpage."
 msgstr "Para alquilar, por favor hágalo desde la web."
 
+msgctxt "#30035"
+msgid "Movie unavailable. Please retry later."
+msgstr "Película no disponible. Reintente más tarde."
+
 msgctxt "#30100"
 msgid "General"
 msgstr "General"
