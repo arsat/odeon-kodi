@@ -313,19 +313,6 @@ def add_film_item(prod, params):
 
     context_menu = []
 
-    # reproducir/continuar viendo: por menu contextual
-    if not has_subprods:
-        menu_text = translation(30016) if percen < 2 else translation(30017)
-        context_menu.append((menu_text, run_plugin('play&context=1', prod, params)))
-
-    # ficha técnica: Action(Info) no siempre está disponible por teclado
-    context_menu.append((translation(30018), run_plugin('show_info', prod, params)))
-
-    # marcar como vista: no para cabeceras de series y compilados
-    if not has_subprods:
-        menu_text = translation(30019) if not prod['vista']['completa'] else translation(30020)
-        context_menu.append((menu_text, run_plugin('toggle_setview', prod, params)))
-
     # agregar/quitar a mi sala: no para capitulos, sí para todos los demás
     if 'serie' not in prod['tags']:
         menu_text = translation(30021) if not prod.get('misala') else translation(30022)
@@ -360,12 +347,6 @@ def add_film_item(prod, params):
     xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=item, isFolder=is_folder)
 
 
-def toggle_setview(params):
-    path = '{0}/vista/{1}/{2}'.format(params['source'], PID, params['sid'])
-    json_request(path)
-    xbmc.executebuiltin("Container.Refresh")
-
-
 def toggle_misala(params):
     path = '{0}/amisala/{1}/{2}'.format(params['source'], PID, params['sid'])
     json_request(path)
@@ -383,10 +364,6 @@ def user_qualify(params):
     else:
         xbmcgui.Dialog().ok('Error ({0})'.format(response.status_code), response.content)
         sys.exit(0)
-
-
-def show_info(params):
-    xbmc.executebuiltin('Action(Info)')
 
 
 def sort(params):
@@ -414,7 +391,7 @@ def heartbeat(source, sid, currentTime, totalTime):
     # xbmc.executebuiltin('Notification(%s, %s, %d, %s)'%(addon_name, 'Beat ' + str(currentTime/60), 1000, addon_icon))
 
 
-def monitor(source, sid, seek=None):
+def monitor(source, sid):
     player = xbmc.Player()
     monitor = xbmc.Monitor()
 
@@ -429,10 +406,6 @@ def monitor(source, sid, seek=None):
         xbmcgui.Dialog().ok(addon_name, translation(30028))
         return
 
-    if seek: player.seekTime(float(seek))
-    if monitor.waitForAbort(3): return
-    if not player.isPlayingVideo(): return
-
     lastTime = player.getTime()
     beatTime = lastTime - 60
     totalTime = player.getTotalTime()
@@ -440,7 +413,7 @@ def monitor(source, sid, seek=None):
     while player.isPlayingVideo() and not monitor.abortRequested():
         currentTime = player.getTime()
         if abs(currentTime - lastTime) > 15:
-            # seek
+            # user seek
             heartbeat(source, sid, currentTime, totalTime)
             beatTime = currentTime
 
@@ -462,28 +435,9 @@ def play(params):
     if data:
         response = requests.get(data["url"], headers=get_headers(auth=utils.digest(clave)))
         if response.status_code == 200:
-            if params.has_key('context'):
-                # acceso por menu contextual debe setear metadata
-                path = '{0}/prod/{1}?perfil={2}'.format(params['source'], params['sid'], PID)
-                prod = json_request(path)
-
-                info = get_info(prod)
-                item = xbmcgui.ListItem(label=info['title'], path=data["url"])
-                item.setInfo('video', info)
-                item.setArt(get_art(prod))
-
-                item.addStreamInfo('video', {'codec': 'h264'})
-                item.addStreamInfo('audio', {'codec': 'aac', 'language' : 'es'})
-
-                xbmc.Player().play(data["url"], item)
-                seek = data.get('seek')
-            else:
-                # player normal Kodi
-                item = xbmcgui.ListItem(path=data["url"])
-                xbmcplugin.setResolvedUrl(addon_handle, True, item)
-                seek = None # es automático
-
-            monitor(params['source'], params['sid'], seek)
+            item = xbmcgui.ListItem(path=data["url"])
+            xbmcplugin.setResolvedUrl(addon_handle, True, item)
+            monitor(params['source'], params['sid'])
         else:
             show_error('Error Player', response.status_code, translation(30035))
             xbmc.sleep(1000)

@@ -76,26 +76,6 @@ msgctxt "#30015"
 msgid "Featured"
 msgstr "Destacados"
 
-msgctxt "#30016"
-msgid "Play from here"
-msgstr "Reproducir"
-
-msgctxt "#30017"
-msgid "Continue playing"
-msgstr "Continuar viendo"
-
-msgctxt "#30018"
-msgid "Show info"
-msgstr "Ficha técnica"
-
-msgctxt "#30019"
-msgid "Mark as watched"
-msgstr "Marcar como vista"
-
-msgctxt "#30020"
-msgid "Mark as unwatched"
-msgstr "Marcar como no vista"
-
 msgctxt "#30021"
 msgid "Add to mi sala"
 msgstr "Agregar a mi sala"
